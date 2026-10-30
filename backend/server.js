@@ -1,27 +1,56 @@
-const express = require('express');
-const cors = require('cors');
-const path = require('path');
-const fs = require('fs');
-const crypto = require('crypto');
-const multer = require('multer');
-const { Sequelize, DataTypes, Op } = require('sequelize');
+import 'dotenv/config';
+import express from 'express';
+import cors from 'cors';
+import path from 'path';
+import fs from 'fs';
+import crypto from 'crypto';
+import multer from 'multer';
+import { fileURLToPath } from 'url';
+import { Sequelize, DataTypes, Op } from 'sequelize';
+
+// ESM equivalent of __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
-
-// Enable Middleware
-app.use(cors());
-app.use(express.json());
 
 // -----------------------------------------------------------------------------
 // 1. DATABASE CONFIGURATION (PostgreSQL via Sequelize)
 // -----------------------------------------------------------------------------
+
 const sequelize = new Sequelize(
-  process.env.DATABASE_URL || 'postgresql://postgres:P05t9r35.1@localhost:5432/dashboard_db',
+  process.env.DB_NAME,
+  process.env.DB_USER,
+  process.env.DB_PASSWORD,
   {
+    host: process.env.DB_HOST,
+    port: process.env.DB_PORT,
     dialect: 'postgres',
-    logging: false, // Set to console.log to debug SQL queries
+    logging: false,
   }
 );
+
+// Enable Middleware
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps, curl, Postman)
+    if (!origin) return callback(null, true);
+
+    // Allow any *.pages.dev domain or localhost
+    if (origin.endsWith('.pages.dev') || origin.includes('localhost')) {
+      return callback(null, true);
+    }
+
+    return callback(new Error('Not allowed by CORS'));
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+}));
+
+app.options('*', cors());
+
+app.use(express.json());
 
 // Define ImageFile Model
 const ImageFile = sequelize.define('ImageFile', {
@@ -62,7 +91,7 @@ const formatImageDict = (image) => {
     filename: image.filename,
     file_type: image.file_type,
     file_path: image.file_path,
-    url: `http://localhost:5000/uploads/${image.filename}`,
+    url: `/uploads/${image.filename}`, // Changed from http://localhost:5000/uploads/...
     created_at: createdAtFormatted,
   };
 };

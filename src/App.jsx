@@ -23,16 +23,18 @@ export default function App() {
 
   const fileInputRef = useRef(null);
 
+  // Helper to extract the backend API base URL from Vite environment variables
+  const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
+
   const loadData = () => {
     setLoading(true);
 
-    // Using relative paths to utilize Vite proxy (http://localhost:5000)
-    fetch('/api/images/stats')
+    fetch(`${API_BASE}/api/images/stats`)
       .then((res) => res.json())
       .then((data) => setImageStats(data))
       .catch(() => {});
 
-    fetch('/api/images/all')
+    fetch(`${API_BASE}/api/images/all`)
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data)) setAllImages(data);
@@ -56,7 +58,7 @@ export default function App() {
     setUploading(true);
     setUploadMessage(null);
 
-    fetch('/api/upload', {
+    fetch(`${API_BASE}/api/upload`, {
       method: 'POST',
       body: formData,
     })
@@ -81,7 +83,7 @@ export default function App() {
 
     setDeletingId(imageId);
 
-    fetch(`/api/images/${imageId}`, {
+    fetch(`${API_BASE}/api/images/${imageId}`, {
       method: 'DELETE',
     })
       .then((res) => {
@@ -98,10 +100,23 @@ export default function App() {
 
   const latestImg = imageStats?.latestImage;
 
+  // Fixed helper: guarantees all image URLs route through the Cloudflare Tunnel URL
   const getImageUrl = (img) => {
     if (!img) return '';
-    if (img.url) return img.url;
-    return `/uploads/${img.filename}`;
+
+    // If the database stored a full http(s) URL:
+    if (img.url && img.url.startsWith('http')) {
+      // If it contains localhost or 127.0.0.1, replace the origin with API_BASE
+      if (img.url.includes('localhost') || img.url.includes('127.0.0.1')) {
+        const pathOnly = img.url.replace(/^https?:\/\/[^\/]+/, '');
+        return `${API_BASE}${pathOnly}`;
+      }
+      return img.url;
+    }
+    
+    // Fallback using filename
+    const cleanPath = img.filename ? `/uploads/${img.filename}` : img.url || '';
+    return `${API_BASE}${cleanPath.startsWith('/') ? cleanPath : `/${cleanPath}`}`;
   };
 
   return (
@@ -128,9 +143,9 @@ export default function App() {
         <Card className="border border-slate-200 shadow-sm bg-white">
           <CardContent className="p-6 flex flex-col md:flex-row items-center justify-between gap-4">
             <div>
-              <h3 className="text-base font-semibold text-slate-900">Upload New Image</h3>
+              <h3 className="text-base font-semibold text-slate-900">Upload u image</h3>
               <p className="text-xs text-slate-500">
-                Select a PNG, JPEG, or WEBP image to store in postgre.
+                PNG, JPEG, or WEBP.
               </p>
               {uploadMessage && (
                 <p className="text-xs font-medium text-emerald-600 mt-2 flex items-center gap-1">

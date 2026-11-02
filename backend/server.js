@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import http from "http";
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
@@ -18,35 +19,41 @@ const app = express();
 // 1. DATABASE CONFIGURATION (PostgreSQL via Sequelize)
 // -----------------------------------------------------------------------------
 
-const sequelize = new Sequelize(
-  process.env.DB_NAME,
-  process.env.DB_USER,
-  process.env.DB_PASSWORD,
-  {
-    host: process.env.DB_HOST,
-    port: process.env.DB_PORT,
-    dialect: 'postgres',
-    logging: false,
+const sequelize = new Sequelize(process.env.DATABASE_URL, {
+  dialect: 'postgres',
+  logging: false,
+  dialectOptions: {
+    ssl: {
+      require: true,
+      rejectUnauthorized: false
+    }
   }
-);
+});
+
+sequelize.authenticate()
+  .then(() => console.log('Successfully connected to Neon PostgreSQL!'))
+  .catch((err) => console.error('Connection error:', err));
 
 // Enable Middleware
-app.use(cors({
+const corsOptions = {
   origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps, curl, Postman)
     if (!origin) return callback(null, true);
-
-    // Allow any *.pages.dev domain or localhost
     if (origin.endsWith('.pages.dev') || origin.includes('localhost')) {
       return callback(null, true);
     }
-
     return callback(new Error('Not allowed by CORS'));
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
-}));
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions)); // Preflight handler
+
+// 2. Body Parsing Middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 app.options('*', cors());
 
